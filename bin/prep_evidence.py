@@ -3,6 +3,11 @@ from utility import file_format, run_subprocess, make_directory, file_exists_and
 from Bio import SeqIO
 import pandas as pd
 
+#Authors: "Amrei Knuth", "Lars Gabriel"
+#Credits: "Katharina Hoff"
+#Email:"lars.gabriel@uni-greifswald.de"
+#Date: "Janurary 2025"
+
 logger = logging.getLogger(__name__)
 
 def indexing(genome_fasta, hisat_path, threads, index_name="genome"):

@@ -3,6 +3,11 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from utility import make_directory, run_subprocess, file_exists_and_not_empty
 
+#Authors: "Amrei Knuth", "Lars Gabriel"
+#Credits: "Katharina Hoff"
+#Email:"lars.gabriel@uni-greifswald.de"
+#Date: "Janurary 2025"
+
 logger = logging.getLogger(__name__)
 
 def getting_hc_supported_by_proteins(diamond_tsv, transdecoder_pep, protein_file, 

@@ -2,6 +2,11 @@ import yaml, logging, os, shutil, subprocess
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
+#Authors: "Amrei Knuth", "Lars Gabriel"
+#Credits: "Katharina Hoff"
+#Email:"lars.gabriel@uni-greifswald.de"
+#Date: "Janurary 2025"
+
 logger = logging.getLogger(__name__)
 
 def read_yaml(file_path):

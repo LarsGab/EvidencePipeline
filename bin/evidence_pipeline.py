@@ -5,6 +5,10 @@ import prep_evidence as p_e
 import generate_hc_genes as hc
 import generate_hints as hints
 
+#Authors: "Amrei Knuth", "Lars Gabriel"
+#Credits: "Katharina Hoff"
+#Email:"lars.gabriel@uni-greifswald.de"
+#Date: "Janurary 2025"
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')

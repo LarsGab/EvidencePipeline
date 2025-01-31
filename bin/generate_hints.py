@@ -1,6 +1,11 @@
 import os, logging, shutil
 from utility import run_subprocess
 
+#Authors: "Lars Gabriel"
+#Credits: "Katharina Hoff"
+#Email:"lars.gabriel@uni-greifswald.de"
+#Date: "Janurary 2025"
+
 logger = logging.getLogger(__name__)
 
 def aln2hints(aln_file, final_out_file, scripts_path, prg="miniprot", priority=4):
