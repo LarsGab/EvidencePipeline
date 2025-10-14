@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "EvidencePipeline"
+version = "0.0.1"
+authors = [
+  { name="Lars Gabriel", email="lgabriel23@gmx.de" },
+  { name="Amrei Knuth", email="" },
+  { name="Katharina Hoff", email="katharina.hoff@uni-greifswald.de" },
+  # please add yourself if you are a contributor
+]
+description = "Evidence pipeline for generating data for gene prediction."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = [
+    "biopython"
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/LarsGab/EvidencePipeline"
+Issues = "https://github.com/LarsGab/EvidencePipeline/issues"
