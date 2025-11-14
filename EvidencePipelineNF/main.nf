@@ -67,11 +67,15 @@ workflow {
     CH_GENOME   = Channel.value(genomeFile)
     CH_PROTEINS = Channel.value(proteinsFile)
 
-    def DO_SE = (params.rnaseq_single && params.rnaseq_single.size() > 0) ||
+    def DO_SE_LOCAL = params.rnaseq_single && params.rnaseq_single.size() > 0
+    def DO_PE_LOCAL = params.rnaseq_paired && params.rnaseq_paired.size() > 0
+    def DO_ISO_LOCAL = params.isoseq && params.isoseq.size() > 0
+
+    def DO_SE = DO_SE_LOCAL ||
         (params.rnaseq_sra_single && params.rnaseq_sra_single.size() > 0)
-    def DO_PE = (params.rnaseq_paired && params.rnaseq_paired.size() > 0) ||
+    def DO_PE = DO_PE_LOCAL ||
         (params.rnaseq_sra_paired && params.rnaseq_sra_paired.size() > 0)
-    def DO_ISO = (params.isoseq && params.isoseq.size() > 0) ||
+    def DO_ISO = DO_ISO_LOCAL ||
         (params.isoseq_sra && params.isoseq_sra.size() > 0)    
 
     
@@ -99,7 +103,7 @@ workflow {
 
     // RNA-Seq PE channel 
     if (DO_PE) {
-        CH_PAIRED_LOCAL = params.rnaseq_paired ?
+        CH_PAIRED_LOCAL = DO_PE_LOCAL ?
             Channel.fromFilePairs(params.rnaseq_paired, flat: true, checkIfExists: true)
             : Channel.empty()
         if (params.rnaseq_sra_paired) {
@@ -121,7 +125,7 @@ workflow {
 
     // RNA-Seq SE channel
     if (DO_SE) {
-        CH_SINGLE_LOCAL = DO_SE
+        CH_SINGLE_LOCAL = DO_SE_LOCAL
             ? Channel.fromPath(params.rnaseq_single, checkIfExists: true)
             : Channel.empty()
 
@@ -140,7 +144,7 @@ workflow {
 
     // Isoseq channel
     if (DO_ISO) {
-        CH_ISO_LOCAL = DO_ISO
+        CH_ISO_LOCAL = DO_ISO_LOCAL
             ? Channel.fromPath(params.isoseq, checkIfExists: true)
             : Channel.empty()
         
