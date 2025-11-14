@@ -1,19 +1,28 @@
 nextflow.enable.dsl=2
 
 process CONCAT_HINTS {
-  publishDir "${params.outdir}/hints", mode: 'copy'   
+  publishDir "${params.outdir}", mode: 'copy'   
 
   input:
     path(prot)
-    path(rnaseq)
-    path(isoseq)
+    path(rnaseq), stageAs: 'rnaseq_hints.gff'
+    path(isoseq), stageAs: 'isoseq_hints.gff'
 
   output:
-    path "hints/all_hints.gff", emit: hints
+    path "hintsfile.gff", emit: hints
 
   script:
   """
-  mkdir -p hints
-  cat ${prot} ${ rnaseq ?: "/dev/null" } ${ isoseq ?: "/dev/null" } > hints/all_hints.gff
+  cat ${prot} ${ rnaseq ?: "/dev/null" } ${ isoseq ?: "/dev/null" } > hintsfile.gff
+  """
+}
+
+process EMPTY_FILE {
+  output:
+    path 'empty.txt'
+
+  script:
+  """
+    touch empty.txt
   """
 }
