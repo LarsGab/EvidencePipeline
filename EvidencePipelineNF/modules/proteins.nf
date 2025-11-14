@@ -44,7 +44,7 @@ process ALN2HINTS {
   output: path "hints/hints_protein.gff", emit: hints
   script: """
   mkdir -p hints
-  ${params.tools.aln2hints} --in=${gtf} --out=hints/prot_hintsfile.aln2hints.temp.gff --prg=miniprot --priority=4
+  ${projectDir}/scripts/aln2hints.pl --in=${gtf} --out=hints/prot_hintsfile.aln2hints.temp.gff --prg=miniprot --priority=4
   cp hints/prot_hintsfile.aln2hints.temp.gff hints/hints_protein.gff
   """
 }

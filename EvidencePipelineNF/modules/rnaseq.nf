@@ -71,6 +71,6 @@ process BAM2HINTS {
   output: path "${bam.simpleName}.hints.gff", emit: hints
   script: """
   ${params.tools.bam2hints} --intronsonly --in=${bam} --out=${bam}.temp
-  ${params.tools.filterIntronsFindStrand} ${genome} ${bam}.temp --score > ${bam.simpleName}.hints.gff
+  ${projectDir}/scripts/filterIntronsFindStrand.pl ${genome} ${bam}.temp --score > ${bam.simpleName}.hints.gff
   """
 }

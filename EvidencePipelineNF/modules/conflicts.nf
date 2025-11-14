@@ -7,6 +7,6 @@ process REMOVE_CONFLICTING_WITH_PROTHINT {
   when: params.prothint_conflict_filter
   script: """
   mkdir -p hc
-  python ${projectDir}/removeConflictingPredictions.py     ${pred_gtf} ${prothint_spaln_gff} hc/predictions.noconflict.gtf --intronMargin 100
+  python3 ${projectDir}/scripts/removeConflictingPredictions.py     ${pred_gtf} ${prothint_spaln_gff} hc/predictions.noconflict.gtf --intronMargin 100
   """
 }

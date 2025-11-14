@@ -259,6 +259,7 @@ def from_transcript_to_genome(cds_gff3, transcripts_gff3, transcripts_fasta, out
     logging.info("Converting transcript coordinates to genome coordinates...")
 
     transdecoder_executable = os.path.join(transdecoder_util, "cdna_alignment_orf_to_genome_orf.pl")
+    transdecoder_executable = "cdna_alignment_orf_to_genome_orf.pl"
     command = [
         transdecoder_executable,
         cds_gff3,
@@ -332,6 +333,7 @@ def finding_protein_conflicts(candidates_bed, reference_bed, bedtools_path, outp
 
     # Construct the Bedtools command
     bedtools_executable = os.path.join(bedtools_path, "bedtools")
+    bedtools_executable = "bedtools"
     command = [
         bedtools_executable,
         "coverage",
@@ -404,7 +406,7 @@ def from_pep_file_to_gff3(orf_pep, transcript_gtf, output_gff3):
     """
     logging.info("Generating GFF3 file from TransDecoder PEP and StringTie GTF...")
 
-    # Step 1: Parse transcript lengths from GTF
+    # Parse transcript lengths from GTF
     transcript_lengths = {}
 
     with open(transcript_gtf, "r") as transcript_file:
@@ -422,7 +424,7 @@ def from_pep_file_to_gff3(orf_pep, transcript_gtf, output_gff3):
                     transcript_id = transcript_id_match.group(1)
                     transcript_lengths[transcript_id] = transcript_lengths.get(transcript_id, 0) + length
 
-    # Step 2: Create the GFF3 file
+    # Create the GFF3 file
     tool_stringtie = "StringTie"
     tool_transdecoder = "TransDecoder"
 
@@ -430,9 +432,9 @@ def from_pep_file_to_gff3(orf_pep, transcript_gtf, output_gff3):
         for record in SeqIO.parse(orf_pep, "fasta"):
             transcript_id = record.id.split(".p")[0]
 
-            # if transcript_id not in transcript_lengths:
-            #     logging.warning(f"Transcript ID {transcript_id} not found in GTF, skipping.")
-            #     continue
+            if transcript_id not in transcript_lengths:
+                logging.warning(f"Transcript ID {transcript_id} not found in GTF, skipping.")
+                continue
 
             transcript_length = transcript_lengths[transcript_id]
             description = record.description
@@ -514,7 +516,7 @@ def preparing_miniprot_gff_for_conflict_comparison(miniprot_gff, output_bed="ref
     return output_bed
 
 
-def getting_hc_supported_by_intrinsic(q_dict, stringtie_gtf, stringtie_gff3, 
+def getting_hc_supported_by_intrinsic(q_dict, stringtie_gtf, transdecoder_gff, 
                     transcript_fasta, miniprot_gff, transdecoder_util_path, bedtools_path,
                     output_dir="./", min_cds_len=300, score_threshold=50):
     """
@@ -572,7 +574,7 @@ def getting_hc_supported_by_intrinsic(q_dict, stringtie_gtf, stringtie_gff3,
     from_pep_file_to_gff3(intrinsic_one_isoform, stringtie_gtf, intrinsic_gff3)
 
     # Convert transcript coordinates to genome coordinates
-    from_transcript_to_genome(intrinsic_gff3, stringtie_gff3, transcript_fasta, 
+    from_transcript_to_genome(intrinsic_gff3, transdecoder_gff, transcript_fasta, 
         intrinsic_genome_gff3, transdecoder_util_path)
 
     # Prepare conflict comparison files

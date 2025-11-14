@@ -36,7 +36,7 @@ include { RUN_TIBERIUS; SPLIT_GENOME; MERGE_TIBERIUS; MERGE_TIBERIUS_TRAIN_PRIO;
 include { CONCAT_HINTS; EMPTY_FILE } from './modules/util.nf'
 include { STRINGTIE_ASSEMBLE_RNA; STRINGTIE_ASSEMBLE_ISO; STRINGTIE_ASSEMBLE_MIX } from './modules/assembly.nf'
 include { TD_ALL; SHORTEN_INCOMPLETE_ORFS; CDS_CLASSIFY_AND_REVISE;} from './modules/transdecoder.nf'
-include { HC_SUPPORTED_BY_PROTEINS; HC_SUPPORTED_BY_INTRINSIC_AND_TRAINING; HC_SUPPORTED; HC_FORMAT_FILTER } from './modules/hc.nf'
+include { HC_SUPPORTED; HC_FORMAT_FILTER } from './modules/hc.nf'
 include { REMOVE_CONFLICTING_WITH_PROTHINT } from './modules/conflicts.nf'
 
 log.info "DEBUG params: genome=${params.genome} proteins=${params.proteins} outdir=${params.outdir}"
@@ -234,11 +234,11 @@ workflow {
         td_all   = TD_ALL( asm.gtf, CH_GENOME )
 
         pep_short = SHORTEN_INCOMPLETE_ORFS( td_all.pep )
-        db        = DIAMOND_MAKEDB(CH_PROTEINS)
-        dia_norm  = DIAMOND_BLASTP_NORM( td_all.pep, db.db )
+        db = DIAMOND_MAKEDB(CH_PROTEINS)
+        dia_norm = DIAMOND_BLASTP_NORM( td_all.pep, db.db )
         dia_short = DIAMOND_BLASTP_SHORT( pep_short.pep_short,  db.db )
-        rev       = CDS_CLASSIFY_AND_REVISE( dia_norm.tsv, dia_short.tsv, td_all.pep, pep_short.pep_short )
-        dia_rev   = DIAMOND_BLASTP_REV( rev.revised_pep, db.db )
+        rev = CDS_CLASSIFY_AND_REVISE( dia_norm.tsv, dia_short.tsv, td_all.pep, pep_short.pep_short )
+        dia_rev = DIAMOND_BLASTP_REV( rev.revised_pep, db.db )
 
         hc = HC_SUPPORTED(
             dia_rev.tsv,

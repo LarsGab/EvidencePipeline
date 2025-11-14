@@ -498,15 +498,15 @@ def get_optimized_pep_file(normal_pep, shortened_pep, classifications, output_pa
 
 def get_cds_classification(normal_tsv, shortened_tsv):
     """
-    Compare DIAMOND search results to classify CDS candidates as complete or incomplete.
+    Compare DIAMOND search results to classify codingseq candidates as complete or incomplete.
 
     This function parses the DIAMOND results from normal and shortened ORFs, calculates 
-    support scores, and determines whether each CDS candidate should be classified as 
+    support scores, and determines whether each codingseq candidate should be classified as 
     "complete" or "incomplete" based on its best protein alignments.
 
     :param normal_tsv: Path to the DIAMOND results for the original TransDecoder output.
     :param shortened_tsv: Path to the DIAMOND results for the shortened ORFs.
-    :return: Dictionary with CDS IDs as keys and classifications ("complete" or "incomplete") as values.
+    :return: Dictionary with codingseq IDs as keys and classifications ("complete" or "incomplete") as values.
     """
     logging.info("Analyzing incomplete ORF predictions...")
 
