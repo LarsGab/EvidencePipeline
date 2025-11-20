@@ -1,9 +1,13 @@
 nextflow.enable.dsl=2
 
 process MINIPROT_ALIGN {
+  label 'container'
+
   input: path genome; path proteins
+
   output: 
     path "miniprot/miniprot.aln", emit: aln
+
   script: """
   mkdir -p miniprot
   ${params.tools.miniprot} -t ${params.threads} --aln ${genome} ${proteins} > miniprot/miniprot.aln
@@ -11,6 +15,8 @@ process MINIPROT_ALIGN {
 }
 
 process MINIPROT_BOUNDARY_SCORE {
+  label 'container'
+
   input:
     path aln
     path score_matrix
@@ -29,10 +35,14 @@ process MINIPROT_BOUNDARY_SCORE {
 }
 
 process MINIPROTHINT_CONVERT {
+  label 'container'
+
   input: path gff
+
   output: 
     path "miniprot/miniprot.gtf", emit: gtf
     path "miniprot/miniprot_trainingGenes.gff", emit: traingff
+
   script: """
   mkdir -p miniprot
   ${params.tools.miniprothint} ${gff} --workdir miniprot --ignoreCoverage --topNperSeed 10 --minScoreFraction 0.5
@@ -41,10 +51,11 @@ process MINIPROTHINT_CONVERT {
 
 process ALN2HINTS {
   input: path gtf
-  output: path "hints/hints_protein.gff", emit: hints
+
+  output: path "hints_protein.gff", emit: hints
+  
   script: """
-  mkdir -p hints
-  ${projectDir}/scripts/aln2hints.pl --in=${gtf} --out=hints/prot_hintsfile.aln2hints.temp.gff --prg=miniprot --priority=4
-  cp hints/prot_hintsfile.aln2hints.temp.gff hints/hints_protein.gff
+  ${projectDir}/scripts/aln2hints.pl --in=${gtf} --out=prot_hintsfile.aln2hints.temp.gff --prg=miniprot --priority=4
+  cp prot_hintsfile.aln2hints.temp.gff hints_protein.gff
   """
 }

@@ -1,5 +1,5 @@
 process RUN_TIBERIUS {
-    label 'gpu'
+    label 'gpu', 'container'
 
     publishDir {"${params.outdir}/"}, mode:'copy', pattern: '*.gtf'
 

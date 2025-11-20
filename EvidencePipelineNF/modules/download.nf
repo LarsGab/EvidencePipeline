@@ -1,5 +1,5 @@
 process DOWNLOAD_SRA_PAIRED {
-  // container params.sra_containers
+  label 'container'
 
   publishDir "${params.outdir}/sra_downloads", mode: 'copy'
 
@@ -17,7 +17,7 @@ process DOWNLOAD_SRA_PAIRED {
 }
 
 process DOWNLOAD_SRA_SINGLE {
-  // container params.sra_containers
+  label 'container'
 
   publishDir "${params.outdir}/sra_downloads", mode: 'copy'
 

@@ -1,5 +1,7 @@
 nextflow.enable.dsl=2
 
+
+
 include { MINIPROT_ALIGN; MINIPROT_BOUNDARY_SCORE; MINIPROTHINT_CONVERT; ALN2HINTS } from './modules/proteins.nf'
 include {
   HISAT2_BUILD
@@ -89,9 +91,9 @@ workflow {
 
     CH_SCORE = Channel.value(SCORE)
 
-    def hasPaired   = params.rnaseq_paired && params.rnaseq_paired.size() > 0
-    def hasSingle   = params.rnaseq_single && params.rnaseq_single.size() > 0
-    def hasIso      = params.isoseq && params.isoseq.size() > 0
+    def hasPaired   = (params.rnaseq_paired && params.rnaseq_paired.size() > 0) || (params.rnaseq_sra_paired && params.rnaseq_sra_paired.size() > 0)
+    def hasSingle   = (params.rnaseq_single && params.rnaseq_single.size() > 0) || (params.rnaseq_sra_single && params.rnaseq_sra_single.size() > 0)
+    def hasIso      = (params.isoseq && params.isoseq.size() > 0) || (params.isoseq_sra && params.isoseq_sra.size() > 0)
     def hasProteins = params.proteins != null
 
     def MODE = params.mode ?: inferMode(hasPaired, hasSingle, hasIso, hasProteins)

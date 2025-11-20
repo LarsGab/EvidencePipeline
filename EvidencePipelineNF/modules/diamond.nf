@@ -1,6 +1,7 @@
 nextflow.enable.dsl=2
 
 process DIAMOND_MAKEDB {
+  label 'container'
   input: path proteins
   output: path "diamond/protein_db.dmnd", emit: db
   script: """
@@ -9,6 +10,7 @@ process DIAMOND_MAKEDB {
   """
 }
 process DIAMOND_BLASTP {
+  label 'container'
   input: path pep; path db
   output: path "diamond/diamond.tsv", emit: tsv
   script: """

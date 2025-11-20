@@ -1,6 +1,7 @@
 nextflow.enable.dsl=2
 
 process MINIMAP2_MAP {
+  label 'container'
   input: path genome; path reads
   output: path "isoseq/${reads.baseName}.sam", emit: sam
   script: """

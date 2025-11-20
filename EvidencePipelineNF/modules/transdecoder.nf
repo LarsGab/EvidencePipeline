@@ -2,6 +2,7 @@ nextflow.enable.dsl=2
 
 //  TransDecoder: gtf->fasta, LongOrfs, Predict
 process TD_ALL {
+  label 'container'
   input:
     path gtf
     path genome

@@ -1,6 +1,7 @@
 nextflow.enable.dsl=2
 
 process STRINGTIE_ASSEMBLE_RNA {
+  label 'container'
   input:
     path genome
     path rnabam
@@ -16,6 +17,7 @@ process STRINGTIE_ASSEMBLE_RNA {
 }
 
 process STRINGTIE_ASSEMBLE_ISO {
+  label 'container'
   input:
     path genome
     path isobam
@@ -31,6 +33,7 @@ process STRINGTIE_ASSEMBLE_ISO {
 }
 
 process STRINGTIE_ASSEMBLE_MIX {
+  label 'container'
   input:
     path genome
     path rnabam,  stageAs: 'rna.bam'
