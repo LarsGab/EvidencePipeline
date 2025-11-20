@@ -27,7 +27,7 @@ except ImportError:  # pragma: no cover - PyYAML is an external dependency
 
 
 REPO_ROOT = Path(__file__).resolve().parent
-PIPELINE_MAIN = REPO_ROOT / "EvidencePipelineNF" / "main.nf"
+PIPELINE_MAIN = REPO_ROOT / "EvidencePipeline" / "main.nf"
 BASE_CONFIG = REPO_ROOT / "conf" / "base.config"
 
 GLOB_CHARS = set("*?[]{}")
