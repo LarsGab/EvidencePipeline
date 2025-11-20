@@ -1,7 +1,7 @@
 nextflow.enable.dsl=2
 
 process MINIPROT_ALIGN {
-  label 'container'
+  label 'container', 'bigmem'
 
   input: path genome; path proteins
 

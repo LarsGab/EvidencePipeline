@@ -44,7 +44,6 @@ def parse_fasta(path):
                 chunks.append(line.strip())
         if seq_id is not None:
             seqs[seq_id] = "".join(chunks).upper()
-    print(seqs["Chr3"][3036860:3036867], seqs["Chr3"][0:10])
     return seqs
 
 
