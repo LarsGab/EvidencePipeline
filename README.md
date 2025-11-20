@@ -1,6 +1,7 @@
 # EvidencePipeline
 
-EvidencePipeline is a Nextflow workflow for generating high-confidece genes and genome annotation hints from extrinsic evidence.
+EvidencePipeline is a Nextflow workflow for generating high-confidence genes and genome annotation hints from extrinsic evidence.
+
 Three sources of extrinsic evidence can be provided:
 - Protein sequences
 - RNA-Seq short reads
@@ -41,6 +42,24 @@ Additionallty, Tiberius can be used to make *ab initio* predictions. These are t
 See `conf/README.md`
 
 
+## Running the Evidence Pipeline
+
+You can start the nextflow pipeline with `evidence_pipeline.py`:
+
+```bash
+cd EvidencePipeline
+./evidence_pipeline.py \
+  --params_yaml conf/params.yaml \
+  --nf_config conf/slurm_generic.config 
+```
+
+The wrapper checks that
+1. the provided params YAML and Nextflow config exist,
+2. all referenced input data files are available, and
+3. the required executables (Nextflow, Singularity, HISAT2, Minimap2, TransDecoder, MiniProt, etc.) can be located on your PATH.
+
+Use `--dry_run` to only perform validations, `--check_tools` when running with native tool installations instead of the Singularity container, and pass additional Nextflow options after `--`, e.g. `./run_evidence_pipeline.py ... -- -with_report`.
+
 ## Outputs
 
 | Path (under `${params.outdir}`) | Contents |
@@ -51,4 +70,3 @@ See `conf/README.md`
 | `tiberius_train.gff3` | Union of Tiberius predictions and HC training genes. |
 | `tiberius_train_prio.gff3` | Same as above but prioritising HC genes on conflicting gene loci. |
 | `sra_downloads/*.fastq.gz` | FASTQs produced by `DOWNLOAD_SRA_*` processes. |
-
