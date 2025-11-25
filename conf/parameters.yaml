@@ -75,4 +75,7 @@ tiberius:
   run: true
   min_split_size: 5000000
   max_files: 20
-  model_cfg: /path/to/tiberius/model_cfg.yaml
+  # name of the Tiberius configuration available at  
+  # https://github.com/Gaius-Augustus/Tiberius/tree/main/model_cfg
+  # or path to a local configuration file
+  model_cfg: model_cfg.yaml

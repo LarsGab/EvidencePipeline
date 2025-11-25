@@ -22,6 +22,7 @@ Usage:
 import sys
 import os
 import argparse
+import gzip
 from math import ceil
 
 def parse_args():
@@ -29,7 +30,7 @@ def parse_args():
         description="Split a genome FASTA into chunks without splitting contigs."
     )
     ap.add_argument("--genome", required=True,
-                    help="Input genome FASTA file.")
+                    help="Input genome FASTA file (plain or .gz).")
     ap.add_argument("--outdir", required=True,
                     help="Output directory for chunk FASTA files.")
     ap.add_argument("--prefix", default="genome_chunk",
@@ -41,10 +42,17 @@ def parse_args():
     return ap.parse_args()
 
 
+def open_maybe_gzip(path):
+    """Open plain text or gzipped FASTA transparently."""
+    if str(path).endswith(".gz"):
+        return gzip.open(path, "rt", encoding="utf-8")
+    return open(path, "r", encoding="utf-8")
+
+
 def fasta_lengths(path):
     """Return list of (header_line, seq_name, length) for each sequence."""
     lengths = []
-    with open(path, "r", encoding="utf-8") as fh:
+    with open_maybe_gzip(path) as fh:
         name = None
         header = None
         length = 0
@@ -137,7 +145,7 @@ def write_chunks(genome_fa, seq_groups, outdir, prefix):
         handles[gi] = open(fpath, "w", encoding="utf-8")
 
     # Stream through genome and dispatch sequences into the correct file
-    with open(genome_fa, "r", encoding="utf-8") as fh:
+    with open_maybe_gzip(genome_fa) as fh:
         current_name = None
         current_group = None
         out = None

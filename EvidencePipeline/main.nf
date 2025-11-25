@@ -2,7 +2,7 @@ nextflow.enable.dsl=2
 
 
 
-include { MINIPROT_ALIGN; MINIPROT_BOUNDARY_SCORE; MINIPROTHINT_CONVERT; ALN2HINTS } from './modules/proteins.nf'
+include { MINIPROT_ALIGN; MINIPROT_BOUNDARY_SCORE; MINIPROTHINT_CONVERT; ALN2HINTS; PREPROCESS_PROTEINDB } from './modules/proteins.nf'
 include {
   HISAT2_BUILD
   HISAT2_MAP_SINGLE
@@ -31,10 +31,10 @@ include {
 } from './modules/diamond.nf'
 include {
     DOWNLOAD_SRA_PAIRED
-    DOWNLOAD_SRA_SINGLE as DOWNLOAD_SRA_SINGLE
-    DOWNLOAD_SRA_SINGLE as DOWNLOAD_SRA_ISO
+    DOWNLOAD_SRA_SINGLE
+    DOWNLOAD_SRA_ISOSEQ
 } from './modules/download.nf'
-include { RUN_TIBERIUS; SPLIT_GENOME; MERGE_TIBERIUS; MERGE_TIBERIUS_TRAIN_PRIO; MERGE_TIBERIUS_TRAIN} from './modules/tiberius.nf'
+include { RUN_TIBERIUS; SPLIT_GENOME; PROTEIN_FROM_GFF; MERGE_TIBERIUS; MERGE_TIBERIUS_TRAIN_PRIO; MERGE_TIBERIUS_TRAIN} from './modules/tiberius.nf'
 include { CONCAT_HINTS; EMPTY_FILE } from './modules/util.nf'
 include { STRINGTIE_ASSEMBLE_RNA; STRINGTIE_ASSEMBLE_ISO; STRINGTIE_ASSEMBLE_MIX } from './modules/assembly.nf'
 include { TD_ALL; SHORTEN_INCOMPLETE_ORFS; CDS_CLASSIFY_AND_REVISE;} from './modules/transdecoder.nf'
@@ -80,8 +80,6 @@ workflow {
     def DO_ISO = DO_ISO_LOCAL ||
         (params.isoseq_sra && params.isoseq_sra.size() > 0)    
 
-    
-
     if( !params.scoring_matrix )
         error "params.scoring_matrix is required by miniprot_boundary_scorer"
 
@@ -118,7 +116,6 @@ workflow {
             CH_PAIRED_SRA = CH_RNASEQ_PAIRED_SRA.map { acc, r1, r2 ->
                 tuple(acc, [r1, r2])
             }
-
             CH_PAIRED = CH_PAIRED_LOCAL.mix(CH_PAIRED_SRA)
         } else {
             CH_PAIRED = CH_PAIRED_LOCAL
@@ -155,7 +152,7 @@ workflow {
                 Channel.from(params.isoseq_sra)
                 : Channel.empty()
 
-            CH_RNASEQ_ISO_SRA = DOWNLOAD_SRA_ISO(CH_ISO_SRA_IDS)
+            CH_RNASEQ_ISO_SRA = DOWNLOAD_SRA_ISOSEQ(CH_ISO_SRA_IDS)
 
             CH_ISO = CH_ISO_LOCAL.mix(CH_RNASEQ_ISO_SRA.map { acc, f -> f })
         } else {
@@ -163,22 +160,23 @@ workflow {
         }
     }
   
-
-
     // Tiberius
     if (params.tiberius.run){
         genome_split = SPLIT_GENOME(CH_GENOME)
         chunks_ch      = genome_split.chunks.flatten()
         tiberius_split = RUN_TIBERIUS(chunks_ch, params.tiberius.model_cfg)
         tiberius = MERGE_TIBERIUS(tiberius_split.toList())
+        tiberius_prot = PROTEIN_FROM_GFF(tiberius, CH_GENOME)
+        proteindb = PREPROCESS_PROTEINDB(CH_PROTEINS, tiberius_prot)
+    } else {
+        proteindb = CH_PROTEINS
     }
 
     // Protein
-    prot_aln = MINIPROT_ALIGN(CH_GENOME, CH_PROTEINS)
+    prot_aln = MINIPROT_ALIGN(CH_GENOME, proteindb)
     scored   = MINIPROT_BOUNDARY_SCORE(prot_aln.aln, CH_SCORE)
     prot_gtf = MINIPROTHINT_CONVERT(scored.gff)
     prot_hints = ALN2HINTS(prot_gtf.gtf)
-    //miniprot_gff_for_conf = file("miniprot/miniprot_parsed.gff")
 
     // RNA-seq
     if( MODE in ['mixed','rnaseq'] && (params.rnaseq_paired.size()>0 || params.rnaseq_single.size()>0) ){
@@ -227,20 +225,19 @@ workflow {
     // Assembly + ORFs + DIAMOND + HC + Training
     if( MODE in ['mixed','rnaseq','isoseq'] ){
         def asm
-
         if( MODE == 'mixed' ) {
-        asm = STRINGTIE_ASSEMBLE_MIX( CH_GENOME, BAM_FOR_ASM, ISO_BAM )
+        asm = STRINGTIE_ASSEMBLE_MIX( BAM_FOR_ASM, ISO_BAM )
         }
         else if( MODE == 'rnaseq' ) {
-        asm = STRINGTIE_ASSEMBLE_RNA( CH_GENOME, BAM_FOR_ASM )
+        asm = STRINGTIE_ASSEMBLE_RNA( BAM_FOR_ASM )
         }
         else if( MODE == 'isoseq' ) {
-        asm = STRINGTIE_ASSEMBLE_ISO( CH_GENOME, ISO_BAM )
+        asm = STRINGTIE_ASSEMBLE_ISO( ISO_BAM )
         }
         td_all   = TD_ALL( asm.gtf, CH_GENOME )
 
         pep_short = SHORTEN_INCOMPLETE_ORFS( td_all.pep )
-        db = DIAMOND_MAKEDB(CH_PROTEINS)
+        db = DIAMOND_MAKEDB(proteindb)
         dia_norm = DIAMOND_BLASTP_NORM( td_all.pep, db.db )
         dia_short = DIAMOND_BLASTP_SHORT( pep_short.pep_short,  db.db )
         rev = CDS_CLASSIFY_AND_REVISE( dia_norm.tsv, dia_short.tsv, td_all.pep, pep_short.pep_short )
@@ -249,7 +246,7 @@ workflow {
         hc = HC_SUPPORTED(
             dia_rev.tsv,
             rev.revised_pep, 
-            CH_PROTEINS,
+            proteindb,
             asm.gtf,
             asm.gff3,
             td_all.cdna,

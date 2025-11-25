@@ -59,3 +59,52 @@ process ALN2HINTS {
   cp prot_hintsfile.aln2hints.temp.gff hints_protein.gff
   """
 }
+
+process PREPROCESS_PROTEINDB {
+  label 'container', 'bigmem'
+
+  input: 
+    path proteinDB 
+    path tiberius_prot
+
+  output: path "protein_preprocessed.fa"
+
+  script: """
+    # Count protein sequences (FASTA headers start with '>')
+    N_PROT=\$(grep -c '^>' "${proteinDB}" || echo 0)
+
+    echo "[PREPROCESS_PROTEINDB] Number of proteins in input: \$N_PROT" >&2
+
+    if [[ "\$N_PROT" -le 1000000 ]]; then
+        echo "[PREPROCESS_PROTEINDB] <= 1,000,000 proteins – using full DB." >&2
+        ln -s "${proteinDB}" protein_preprocessed.fa
+    else
+        echo "[PREPROCESS_PROTEINDB] > 1,000,000 proteins – running DIAMOND soft filter." >&2
+
+        diamond makedb \
+          --in "${tiberius_prot}" \
+          --db tib_db
+
+        diamond blastp \
+          --query "${proteinDB}" \
+          --db tib_db \
+          --out diamond_hits.tsv \
+          --outfmt 6 qseqid sseqid pident length evalue bitscore \
+          --evalue 1e-3 \
+          --id 20 \
+          --min-orf 40 \
+          --max-target-seqs 5 \
+          --threads ${process.cpus} \
+          --very-sensitive
+
+        # Collect unique query IDs (proteins from proteinDB that hit something)
+        cut -f1 diamond_hits.tsv | sort -u > keep_ids.txt
+
+        N_KEEP=\$(wc -l < keep_ids.txt || echo 0)
+        echo "[PREPROCESS_PROTEINDB] Proteins kept after DIAMOND filter: \$N_KEEP" >&2
+
+        # Extract only those proteins
+        seqkit grep -f keep_ids.txt "${proteinDB}" > protein_preprocessed.fa
+    fi
+  """
+}

@@ -1,7 +1,7 @@
 process DOWNLOAD_SRA_PAIRED {
-  label 'container'
+  label 'container', 'bigmem'
 
-  publishDir "${params.outdir}/sra_downloads", mode: 'copy'
+  publishDir "${params.outdir}/sra_downloads/rnaseq_sra_paired/", mode: 'copy'
 
   input:
     val acc
@@ -17,9 +17,27 @@ process DOWNLOAD_SRA_PAIRED {
 }
 
 process DOWNLOAD_SRA_SINGLE {
-  label 'container'
+  label 'container', 'bigmem'
 
-  publishDir "${params.outdir}/sra_downloads", mode: 'copy'
+  publishDir "${params.outdir}/sra_downloads/rnaseq_sra_single/", mode: 'copy'
+
+  input:
+    val acc
+
+  output:
+    tuple val(acc), path("${acc}.fastq.gz")
+
+  script:
+  """
+  fasterq-dump --threads ${params.threads} ${acc}
+  gzip ${acc}.fastq
+  """
+}
+
+process DOWNLOAD_SRA_ISOSEQ {
+  label 'container', 'bigmem'
+
+  publishDir "${params.outdir}/sra_downloads/isoseq_sra/", mode: 'copy'
 
   input:
     val acc

@@ -106,7 +106,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         help="Nextflow profile(s) to activate (comma-separated).",
     )
     parser.add_argument(
-        "--nextflow-bin",
+        "--nextflow_bin",
         default="nextflow",
         help="Path to the Nextflow executable to use.",
     )
@@ -365,6 +365,7 @@ def run_nextflow(
     work_dir: str | None,
     extra_args: Sequence[str],
 ) -> int:
+    launch_cwd = Path.cwd()
     cmd = [
         nextflow_bin,
         "run",
@@ -381,14 +382,14 @@ def run_nextflow(
     if resume:
         cmd.append("-resume")
     if work_dir:
-        cmd.extend(["-work-dir", work_dir])
+        cmd.extend(["-work_dir", work_dir])
     if extra_args:
         cmd.extend(extra_args)
 
     print("[INFO] Launching Nextflow with command:")
     print("       " + " ".join(shlex.quote(part) for part in cmd))
 
-    completed = subprocess.run(cmd, cwd=REPO_ROOT)
+    completed = subprocess.run(cmd, cwd=launch_cwd)
     return completed.returncode
 
 
@@ -400,6 +401,9 @@ def main(argv: Sequence[str]) -> None:
     args.nextflow_args = extra_args
     params_path = Path(args.params_yaml).expanduser().resolve()
     config_path = Path(args.config).expanduser().resolve()
+    wdir: Path | None = None
+    if args.work_dir:
+        wdir = Path(args.work_dir).expanduser().resolve()
 
     if not params_path.exists():
         raise SystemExit(f"Params YAML not found: {params_path}")
@@ -444,7 +448,7 @@ def main(argv: Sequence[str]) -> None:
         profile=args.profile,
         nextflow_bin=args.nextflow_bin,
         resume=args.resume,
-        work_dir=args.work_dir,
+        work_dir=wdir,
         extra_args=args.nextflow_args,
     )
     if returncode != 0:

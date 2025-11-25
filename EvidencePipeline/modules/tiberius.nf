@@ -49,7 +49,7 @@ process MERGE_TIBERIUS {
       path gff_files
 
     output:
-      path "tiberius.gff3", emit: merged
+      path "tiberius.gff3"
 
     script:
     """
@@ -89,5 +89,22 @@ process MERGE_TIBERIUS_TRAIN_PRIO {
     """
     python3 ${projectDir}/scripts/merge_annotations.py --mode priority \\
         --priority-file ${traingenes} ${tiberius} ${traingenes} > tiberius_train_prio.gff3
+    """
+}
+process PROTEIN_FROM_GFF {
+  publishDir {"${params.outdir}/"}, mode:'copy'
+
+  input:
+      path tiberius 
+      path genome
+    
+  output:
+      path "tiberius_proteins.fa"
+
+  script:
+    """
+    gffread ${tiberius} \
+        -g ${genome} \
+        -y tiberius_proteins.fa
     """
 }
