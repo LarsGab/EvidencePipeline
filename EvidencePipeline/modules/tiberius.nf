@@ -1,7 +1,7 @@
 process RUN_TIBERIUS {
     label 'gpu', 'container', 'bigmem'
 
-    publishDir {"${params.outdir}/"}, mode:'copy', pattern: '*.gtf'
+    // publishDir {"${params.outdir}/"}, mode:'copy', pattern: '*.gtf'
 
     container params.tiberius.container
 

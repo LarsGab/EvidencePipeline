@@ -26,7 +26,8 @@ Input:
     We assume transcripts are defined by 'exon' and/or 'CDS' features.
 
 Output:
-    A GFF3 written to stdout (or redirected by the user).
+    A GFF3 written to stdout (or redirected by the user). Source (column 2)
+    preserves the originating annotation source for each gene and child feature.
 
 Usage examples:
 
@@ -42,7 +43,7 @@ import sys
 import argparse
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Set
 
 
 # ----------------- Attribute parsing ----------------- #
@@ -104,14 +105,34 @@ class Transcript:
     source_index: int          # which input file
     seqid: str
     strand: str
+    source_labels: Set[str] = field(default_factory=set)
     exons: List[Tuple[int, int]] = field(default_factory=list)
+    cds: List[Tuple[int, int, str]] = field(default_factory=list)
+
+    @property
+    def source(self) -> str:
+        """Return a stable source string for output."""
+        labels = sorted({s for s in self.source_labels if s})
+        if not labels:
+            return "merge"
+        return ",".join(labels)
 
     @property
     def span(self) -> Tuple[int, int]:
         """Return (start, end) of the transcript span."""
-        starts = [s for s, _ in self.exons]
-        ends = [e for _, e in self.exons]
+        coords = self.exon_intervals
+        starts = [s for s, _ in coords]
+        ends = [e for _, e in coords]
         return min(starts), max(ends)
+
+    @property
+    def exon_intervals(self) -> List[Tuple[int, int]]:
+        """
+        Exon-like intervals used for structure/output. Falls back to CDS if no exons.
+        """
+        if self.exons:
+            return self.exons
+        return [(s, e) for s, e, _ in self.cds]
 
     @property
     def struct_key(self) -> Tuple[str, str, Tuple[Tuple[int, int], ...]]:
@@ -119,7 +140,7 @@ class Transcript:
         Structure key for deduplication:
         (seqid, strand, sorted_exons).
         """
-        exons_sorted = tuple(sorted(self.exons))
+        exons_sorted = tuple(sorted(self.exon_intervals))
         return self.seqid, self.strand, exons_sorted
 
 
@@ -180,14 +201,20 @@ def parse_transcripts_from_file(path: str, source_index: int) -> List[Transcript
                     source_index=source_index,
                     seqid=seqid,
                     strand=strand,
+                    source_labels={source},
                     exons=[],
+                    cds=[],
                 )
 
             tx = tx_map[internal_id]
-            tx.exons.append((int(start), int(end)))
+            tx.source_labels.add(source)
+            if ftype == "exon":
+                tx.exons.append((int(start), int(end)))
+            elif ftype == "CDS":
+                tx.cds.append((int(start), int(end), phase))
 
-    # Filter out transcripts with no exons (shouldn't happen, but just in case)
-    transcripts = [t for t in tx_map.values() if t.exons]
+    # Filter out transcripts with no exon/CDS signal
+    transcripts = [t for t in tx_map.values() if t.exons or t.cds]
     return transcripts
 
 
@@ -325,6 +352,7 @@ def write_clusters_as_gff3(clusters: List[GeneCluster], out_handle):
         - gene
         - transcript
         - exon
+        - CDS
     """
     out_handle.write("##gff-version 3\n")
 
@@ -348,10 +376,15 @@ def write_clusters_as_gff3(clusters: List[GeneCluster], out_handle):
         gc.end = max(ends)
 
         # gene feature
+        gene_sources = sorted({
+            src for tx in gc.transcripts for src in tx.source.split(",") if src
+        })
+        gene_source = ",".join(gene_sources) if gene_sources else "merge"
+
         gene_attrs = {"ID": gc.gene_id}
         gene_row = [
             gc.seqid,
-            "merge",
+            gene_source,
             "gene",
             str(gc.start),
             str(gc.end),
@@ -374,7 +407,7 @@ def write_clusters_as_gff3(clusters: List[GeneCluster], out_handle):
             tx_attrs = {"ID": tx_id, "Parent": gc.gene_id}
             tx_row = [
                 tx.seqid,
-                "merge",
+                tx.source,
                 "transcript",
                 str(t_start),
                 str(t_end),
@@ -386,7 +419,7 @@ def write_clusters_as_gff3(clusters: List[GeneCluster], out_handle):
             out_handle.write("\t".join(tx_row) + "\n")
 
             # exons: sorted by start
-            exons_sorted = sorted(tx.exons)
+            exons_sorted = sorted(tx.exon_intervals)
             exon_num = 1
             for s, e in exons_sorted:
                 exon_id = f"{tx_id}.exon{exon_num}"
@@ -394,7 +427,7 @@ def write_clusters_as_gff3(clusters: List[GeneCluster], out_handle):
                 exon_attrs = {"ID": exon_id, "Parent": tx_id}
                 exon_row = [
                     tx.seqid,
-                    "merge",
+                    tx.source,
                     "exon",
                     str(s),
                     str(e),
@@ -404,6 +437,26 @@ def write_clusters_as_gff3(clusters: List[GeneCluster], out_handle):
                     attrs_to_str(exon_attrs),
                 ]
                 out_handle.write("\t".join(exon_row) + "\n")
+
+            if tx.cds:
+                cds_sorted = sorted(tx.cds, key=lambda item: item[0])
+                cds_num = 1
+                for s, e, phase in cds_sorted:
+                    cds_id = f"{tx_id}.cds{cds_num}"
+                    cds_num += 1
+                    cds_attrs = {"ID": cds_id, "Parent": tx_id}
+                    cds_row = [
+                        tx.seqid,
+                        tx.source,
+                        "CDS",
+                        str(s),
+                        str(e),
+                        ".",
+                        tx.strand,
+                        phase if phase else ".",
+                        attrs_to_str(cds_attrs),
+                    ]
+                    out_handle.write("\t".join(cds_row) + "\n")
 
 
 # ----------------- Main logic ----------------- #

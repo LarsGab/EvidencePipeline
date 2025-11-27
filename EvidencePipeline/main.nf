@@ -162,10 +162,14 @@ workflow {
   
     // Tiberius
     if (params.tiberius.run){
-        genome_split = SPLIT_GENOME(CH_GENOME)
-        chunks_ch      = genome_split.chunks.flatten()
-        tiberius_split = RUN_TIBERIUS(chunks_ch, params.tiberius.model_cfg)
-        tiberius = MERGE_TIBERIUS(tiberius_split.toList())
+        if (params.tiberius.result && file(params.tiberius.result).exists()) {
+            tiberius = Channel.fromPath(params.tiberius.result, checkIfExists: true)
+        } else {
+            genome_split = SPLIT_GENOME(CH_GENOME)
+            chunks_ch      = genome_split.chunks.flatten()
+            tiberius_split = RUN_TIBERIUS(chunks_ch, params.tiberius.model_cfg)
+            tiberius = MERGE_TIBERIUS(tiberius_split.toList())
+        }
         tiberius_prot = PROTEIN_FROM_GFF(tiberius, CH_GENOME)
         proteindb = PREPROCESS_PROTEINDB(CH_PROTEINS, tiberius_prot)
     } else {

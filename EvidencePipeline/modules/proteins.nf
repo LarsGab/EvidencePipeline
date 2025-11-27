@@ -94,7 +94,7 @@ process PREPROCESS_PROTEINDB {
           --id 20 \
           --min-orf 40 \
           --max-target-seqs 5 \
-          --threads ${process.cpus} \
+          --threads ${params.threads} \
           --very-sensitive
 
         # Collect unique query IDs (proteins from proteinDB that hit something)
