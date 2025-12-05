@@ -1,7 +1,5 @@
 nextflow.enable.dsl=2
 
-
-
 include { MINIPROT_ALIGN; MINIPROT_BOUNDARY_SCORE; MINIPROTHINT_CONVERT; ALN2HINTS; PREPROCESS_PROTEINDB } from './modules/proteins.nf'
 include {
   HISAT2_BUILD
@@ -14,7 +12,11 @@ include {
   SAMTOOLS_MERGE as SAMTOOLS_MERGE_ISO
   BAM2HINTS as BAM2HINTS_RNA
 } from './modules/rnaseq.nf'
-
+include {
+    FILTER_ALIGNMENT as FILTER_PE
+    FILTER_ALIGNMENT as FILTER_ISOSEQ
+    FILTER_ALIGNMENT as FILTER_SE
+} from './modules/util.nf'
 include {
   MINIMAP2_MAP
 } from './modules/isoseq.nf'
@@ -36,7 +38,12 @@ include {
 } from './modules/download.nf'
 include { RUN_TIBERIUS; SPLIT_GENOME; PROTEIN_FROM_GFF; MERGE_TIBERIUS; MERGE_TIBERIUS_TRAIN_PRIO; MERGE_TIBERIUS_TRAIN} from './modules/tiberius.nf'
 include { CONCAT_HINTS; EMPTY_FILE } from './modules/util.nf'
-include { STRINGTIE_ASSEMBLE_RNA; STRINGTIE_ASSEMBLE_ISO; STRINGTIE_ASSEMBLE_MIX } from './modules/assembly.nf'
+include { MERGE_TIBERIUS as MERGE_TRAINING} from './modules/tiberius.nf'
+include { 
+    STRINGTIE_MERGE
+    STRINGTIE_ASSEMBLE_RNA
+    STRINGTIE_ASSEMBLE_ISO
+    STRINGTIE_ASSEMBLE_MIX } from './modules/assembly.nf'
 include { TD_ALL; SHORTEN_INCOMPLETE_ORFS; CDS_CLASSIFY_AND_REVISE;} from './modules/transdecoder.nf'
 include { HC_SUPPORTED; HC_FORMAT_FILTER } from './modules/hc.nf'
 include { REMOVE_CONFLICTING_WITH_PROTHINT } from './modules/conflicts.nf'
@@ -181,7 +188,7 @@ workflow {
     scored   = MINIPROT_BOUNDARY_SCORE(prot_aln.aln, CH_SCORE)
     prot_gtf = MINIPROTHINT_CONVERT(scored.gff)
     prot_hints = ALN2HINTS(prot_gtf.gtf)
-
+    def stringtie
     // RNA-seq
     if( MODE in ['mixed','rnaseq'] && (params.rnaseq_paired.size()>0 || params.rnaseq_single.size()>0) ){
         index        = HISAT2_BUILD(CH_GENOME)
@@ -189,56 +196,56 @@ workflow {
 
         if (DO_SE) {
             map_se     = HISAT2_MAP_SINGLE(index.idxdir, CH_SINGLE)
-            sort_se    = SAMTOOLS_VIEW_SORT_SINGLE(map_se.sam)
+            FILTER_SE(map_se.sam)
+            sort_se    = SAMTOOLS_VIEW_SORT_SINGLE(FILTER_SE.out)
             rnaseq_bams = rnaseq_bams.mix(sort_se.bam)
         }
 
         if (DO_PE) {
             map_pe     = HISAT2_MAP_PAIRED(index.idxdir, CH_PAIRED)
-            sort_pe    = SAMTOOLS_VIEW_SORT_PAIRED(map_pe.sam)
+            FILTER_PE(map_pe.sam)
+            sort_pe    = SAMTOOLS_VIEW_SORT_PAIRED(FILTER_PE.out)
             rnaseq_bams = rnaseq_bams.mix(sort_pe.bam)
         }
-
+        
+        asm = STRINGTIE_ASSEMBLE_RNA( rnaseq_bams )
         rnaseq_merged = SAMTOOLS_MERGE_RNA(rnaseq_bams.collect())
         rnaseq_hints  = BAM2HINTS_RNA(rnaseq_merged.bam, CH_GENOME)
         HINTS_RNASEQ  = rnaseq_hints.hints
-        BAM_FOR_ASM   = rnaseq_merged.bam
     } else {
         HINTS_RNASEQ = empty_file
-        BAM_FOR_ASM  = empty_file
     }
 
     //  Iso-Seq
     if( MODE in ['mixed','isoseq'] && DO_ISO ){
         iso_bams = Channel.empty()
         iso_sam   = MINIMAP2_MAP(CH_GENOME, CH_ISO)
-        iso_sort   = SAMTOOLS_VIEW_SORT_ISO(iso_sam.sam)
-        iso_bams = iso_bams.mix(iso_sort.bam)
+        FILTER_ISOSEQ(iso_sam.sam)
+        iso_sort   = SAMTOOLS_VIEW_SORT_ISO(FILTER_ISOSEQ.out)
+        iso_bams = iso_bams.mix(iso_sort.bam)        
+        stringtie_isoseq = STRINGTIE_ASSEMBLE_ISO( iso_bams )
+        
         iso_merged = SAMTOOLS_MERGE_ISO(iso_bams.collect())
         iso_hints  = BAM2HINTS_ISO(iso_merged.bam, CH_GENOME)
         HINTS_ISO    = iso_hints.hints
-        ISO_BAM      = iso_merged.bam
+        // ISO_BAM      = iso_merged.bam
+        if( MODE == 'mixed' && (params.rnaseq_paired.size()>0 || params.rnaseq_single.size()>0) ) {
+            asm_gtf = asm.gtf.mix(stringtie_isoseq.gtf)
+            asm_gff3 = asm.gff3.mix(stringtie_isoseq.gff3)
+        } else {
+            asm = stringtie_isoseq
+        }
     } else {
         HINTS_ISO = empty_file
-        ISO_BAM   = empty_file
     }
 
     // Hints concat
     all_hints = CONCAT_HINTS(prot_hints.hints, HINTS_RNASEQ, HINTS_ISO )
-
+    
     // Assembly + ORFs + DIAMOND + HC + Training
     if( MODE in ['mixed','rnaseq','isoseq'] ){
-        def asm
-        if( MODE == 'mixed' ) {
-        asm = STRINGTIE_ASSEMBLE_MIX( BAM_FOR_ASM, ISO_BAM )
-        }
-        else if( MODE == 'rnaseq' ) {
-        asm = STRINGTIE_ASSEMBLE_RNA( BAM_FOR_ASM )
-        }
-        else if( MODE == 'isoseq' ) {
-        asm = STRINGTIE_ASSEMBLE_ISO( ISO_BAM )
-        }
-        td_all   = TD_ALL( asm.gtf, CH_GENOME )
+        asm = STRINGTIE_MERGE(asm_gtf.collect())
+        td_all   = TD_ALL( asm.gtf, CH_GENOME ) 
 
         pep_short = SHORTEN_INCOMPLETE_ORFS( td_all.pep )
         db = DIAMOND_MAKEDB(proteindb)
@@ -256,7 +263,9 @@ workflow {
             td_all.cdna,
             scored.gff
             )
+            
         traingff = hc.training_gff
+
     } else {
         traingff = prot_gtf.traingff
 

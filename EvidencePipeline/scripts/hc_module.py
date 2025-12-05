@@ -11,75 +11,123 @@ from utility import make_directory, run_subprocess, file_exists_and_not_empty
 
 logger = logging.getLogger(__name__)
 
-def getting_hc_supported_by_proteins(diamond_tsv, transdecoder_pep, protein_file, 
-        output_path="hc_genes.pep"):
+
+def getting_hc_supported_by_proteins(
+    diamond_tsv,
+    transdecoder_pep,
+    protein_file,
+    output_path="hc_genes_strict.pep",
+    min_pident=50.0,    # stricter identity
+    min_qcov=0.9,       # >=90% of ORF covered
+    min_tcov=0.9,       # >=90% of DB protein covered
+    max_evalue=1e-20,   # very strong hits only
+    require_complete=True,
+):
     """
-    Select high-confidence genes supported by protein evidence.
+    Select a *very high-precision* set of genes supported by protein evidence.
 
-    This function filters CDS candidates based on protein alignment criteria using DIAMOND results.
-    Only complete CDS candidates that meet specific criteria are classified as high-confidence.
+    Assumes DIAMOND was run with default outfmt 6:
+      qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore
 
-    :param diamond_tsv: Path to the DIAMOND BLASTp results file.
-    :param transdecoder_pep: Path to the TransDecoder peptide FASTA file.
-    :param protein_file: Path to the protein FASTA file used as the reference database.
-    :param output_path: Path to the output file for high-confidence genes (default: "hc_genes.pep").
-    :return: Dictionary of remaining CDS candidates that are not classified as high-confidence.
+    This is intentionally strict and will have low recall.
     """
-    logging.info("Selecting high-confidence genes supported by protein evidence...")
 
-    # Ensure the output directory exists
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    logging.info("Selecting VERY STRICT high-confidence genes supported by protein evidence...")
 
-    # Dictionary to store protein sequence lengths from the reference database
+    out_dir = os.path.dirname(output_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+
+    # Target protein lengths (from DB)
     t_length_dict = {
         record.id: len(record.seq)
         for record in SeqIO.parse(protein_file, "fasta")
     }
 
-    # Dictionary to store query protein sequences and descriptions
+    # Query ORFs
     q_dict = {
-        record.id: [record.description, record.seq]
+        record.id: record
         for record in SeqIO.parse(transdecoder_pep, "fasta")
     }
+    logging.info("Loaded %d TransDecoder ORFs", len(q_dict))
 
-    # List to store the IDs of high-confidence genes
-    # already_hc_genes = set()
+    seen_hc_queries = set()
 
-    # Process DIAMOND results and identify high-confidence genes
-    with open(diamond_tsv, "r") as tsv, open(output_path, "w") as output:
+    with open(diamond_tsv) as tsv, open(output_path, "w") as output:
         for line in tsv:
-            part = line.strip().split("\t")
-            query_id, protein_id = part[0], part[1]
-            aaident = float(part[2])  # Percentage of identical amino acids
-            align_length = int(part[3])  # Length of the alignment
-            q_start, q_end = int(part[6]), int(part[7])  # Query alignment region
-            t_start, t_end = int(part[8]), int(part[9])  # Target alignment region
+            if not line.strip() or line.startswith("#"):
+                continue
 
-            # Check if the query ID exists in q_dict
-            if query_id in q_dict:
-                record = SeqIO.SeqRecord(seq=q_dict[query_id][1], id=query_id, description=q_dict[query_id][0])
+            part = line.rstrip("\n").split("\t")
+            if len(part) < 12:
+                logging.warning("Skipping malformed DIAMOND line: %s", line.strip())
+                continue
 
-                # Calculate sequence lengths
-                # q_length = len(record.seq) - 1  # Exclude stop codon (*)
-                t_length = t_length_dict.get(protein_id, 0)
+            query_id = part[0]
+            protein_id = part[1]
+            aaident = float(part[2])
+            align_length = int(part[3])
+            q_start = int(part[6])
+            q_end = int(part[7])
+            t_start = int(part[8])
+            t_end = int(part[9])
+            evalue = float(part[10])
+            bitscore = float(part[11])
 
-                # Consider only complete candidates for high-confidence classification
-                if "type:complete" in record.description:
-                    if (q_start - t_start) < 6 and (t_length - align_length) < 15 and aaident > 95:
-                        SeqIO.write(record, output, "fasta")
-                        # gene_id = ".".join(query_id.split(".")[:2])
-                        # # already_hc_genes.add(gene_id)
-                        # del q_dict[query_id]  # Remove from further analysis
+            # Skip queries that are not from TransDecoder
+            if query_id not in q_dict:
+                continue
 
-    # Remove CDS candidates belonging to genes already classified as high-confidence
-    # q_dict = {
-    #     id: value
-    #     for id, value in q_dict.items()
-    #     if ".".join(id.split(".")[:2]) not in already_hc_genes
-    # }
+            # Avoid writing same query multiple times
+            if query_id in seen_hc_queries:
+                continue
 
-    # logging.info("High-confidence gene selection completed successfully.")
-    # return q_dict
+            record = q_dict[query_id]
+
+            # Only complete ORFs (optional)
+            if require_complete and "type:complete" not in record.description:
+                continue
+
+            # Query length without trailing '*'
+            seq_str = str(record.seq)
+            if seq_str.endswith("*"):
+                q_length = len(seq_str) - 1
+            else:
+                q_length = len(seq_str)
+
+            if q_length <= 0:
+                continue
+
+            t_length = t_length_dict.get(protein_id, 0)
+            if t_length <= 0:
+                # No length info -> skip for strict mode
+                continue
+
+            # Coverage
+            q_cov = align_length / q_length
+            t_cov = align_length / t_length
+
+            # OPTIONAL: also require near-N-terminal alignment
+            # This is VERY strict; uncomment if you want it:
+            # if abs(q_start - 1) > 5 or abs(t_start - 1) > 5:
+            #     continue
+
+            # Strict criteria
+            if (
+                evalue <= max_evalue
+                and aaident >= min_pident
+                and q_cov >= min_qcov
+                and t_cov >= min_tcov
+            ):
+                SeqIO.write(record, output, "fasta")
+                seen_hc_queries.add(query_id)
+                # we don't break here because each line is a different query or skipped by seen_hc_queries
+
+    logging.info(
+        "VERY STRICT high-confidence selection completed: %d ORFs written to %s",
+        len(seen_hc_queries),
+        output_path,
+    )
     return output_path
 
 def align_proteins(genome, protein, miniprot_path, miniprot_scorer_path, miniprothint_path,
@@ -504,7 +552,7 @@ def preparing_miniprot_gff_for_conflict_comparison(miniprot_gff, output_bed="ref
                 continue  # Skip non-CDS entries
 
             chromosome, start, stop, strand = parts[0], parts[3], parts[4], parts[6]
-            prot_id_match = re.search(r"prot=(prot\d+)", parts[8])
+            prot_id_match = re.search(r'\bprot=([^;]+)', parts[8])
 
             if prot_id_match:
                 prot_id = prot_id_match.group(1)
